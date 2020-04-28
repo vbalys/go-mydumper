@@ -33,7 +33,7 @@ func TestPool(t *testing.T) {
 		fakedbs.AddQueryPattern("select .*", &sqltypes.Result{})
 	}
 
-	pool, err := NewPool(log, 8, address, "mock", "mock", "")
+	pool, err := NewPool(log, 8, address, "mock", "mock", "", "")
 	assert.Nil(t, err)
 
 	var wg sync.WaitGroup

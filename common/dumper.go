@@ -28,9 +28,6 @@ func writeMetaData(args *config.Config) {
 }
 
 func dumpDatabaseSchema(log *xlog.Log, conn *Connection, args *config.Config, database string) {
-	err := conn.Execute(fmt.Sprintf("USE `%s`", database))
-	AssertNil(err)
-
 	schema := fmt.Sprintf("CREATE DATABASE IF NOT EXISTS `%s`;", database)
 	file := fmt.Sprintf("%s/%s-schema-create.sql", args.Outdir, database)
 	WriteFile(file, schema)
@@ -188,16 +185,15 @@ func filterDatabases(log *xlog.Log, conn *Connection, filter *regexp.Regexp, inv
 
 // Dumper used to start the dumper worker.
 func Dumper(log *xlog.Log, args *config.Config) {
-	pool, err := NewPool(log, args.Threads, args.Address, args.User, args.Password, args.SessionVars)
+	initPool, err := NewPool(log, args.Threads, args.Address, args.User, args.Password, "", "")
 	AssertNil(err)
-	defer pool.Close()
+	defer initPool.Close()
 
 	// Meta data.
 	writeMetaData(args)
 
 	// database.
-	var wg sync.WaitGroup
-	conn := pool.Get()
+	conn := initPool.Get()
 	var databases []string
 	t := time.Now()
 	if args.DatabaseRegexp != "" {
@@ -214,7 +210,6 @@ func Dumper(log *xlog.Log, args *config.Config) {
 		dumpDatabaseSchema(log, conn, args, database)
 	}
 
-	// tables.
 	tables := make([][]string, len(databases))
 	for i, database := range databases {
 		if args.Table != "" {
@@ -223,13 +218,19 @@ func Dumper(log *xlog.Log, args *config.Config) {
 			tables[i] = allTables(log, conn, database)
 		}
 	}
-	pool.Put(conn)
+	initPool.Put(conn)
 
+	var wg sync.WaitGroup
 	for i, database := range databases {
+		pool, err := NewPool(log, args.Threads/len(databases), args.Address, args.User, args.Password, args.SessionVars, database)
+		AssertNil(err)
+		defer pool.Close()
 		for _, table := range tables[i] {
-			conn := pool.Get()
+			conn := initPool.Get()
 			dumpTableSchema(log, conn, args, database, table)
+			initPool.Put(conn)
 
+			conn = pool.Get()
 			wg.Add(1)
 			go func(conn *Connection, database string, table string) {
 				defer func() {
