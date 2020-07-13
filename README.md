@@ -11,17 +11,12 @@
 ## Build
 
 ```
-$git clone https://github.com/xelabs/go-mydumper
-$cd go-mydumper
-$make build
-$./bin/mydumper   -h
-$./bin/myloader   -h
-```
-
-## Test
-
-```
-$make test
+$ git clone https://github.com/aquarapid/go-mydumper
+$ cd go-mydumper
+$ git checkout jacques_vitess
+$ make build
+$ ./bin/mydumper -h
+$ ./bin/myloader -h
 ```
 
 ## Usage
@@ -30,49 +25,32 @@ $make test
 
 ```
 ./bin/mydumper -h
-Usage: ./bin/mydumper -c conf/mydumper.ini.sample
+Usage: ./bin/mydumper -c conf/mydumper.ini.vitess
   -c string
     	config file
 
 Examples:
-$./bin/mydumper -c conf/mydumper.ini.sample
- 2017/10/25 13:12:52.933391 dumper.go:35:         [INFO]        dumping.database[sbtest].schema...
- 2017/10/25 13:12:52.937743 dumper.go:45:         [INFO]        dumping.table[sbtest.benchyou0].schema...
- 2017/10/25 13:12:52.937791 dumper.go:168:        [INFO]        dumping.table[sbtest.benchyou0].datas.thread[1]...
- 2017/10/25 13:12:52.939008 dumper.go:45:         [INFO]        dumping.table[sbtest.benchyou1].schema...
- 2017/10/25 13:12:52.939055 dumper.go:168:        [INFO]        dumping.table[sbtest.benchyou1].datas.thread[2]...
- 2017/10/25 13:12:55.611905 dumper.go:105:        [INFO]        dumping.table[sbtest.benchyou0].rows[633987].bytes[128MB].part[1].thread[1]
- 2017/10/25 13:12:55.765127 dumper.go:105:        [INFO]        dumping.table[sbtest.benchyou1].rows[633987].bytes[128MB].part[1].thread[2]
- 2017/10/25 13:12:58.146093 dumper.go:105:        [INFO]        dumping.table[sbtest.benchyou0].rows[1266050].bytes[256MB].part[2].thread[1]
- 2017/10/25 13:12:58.253219 dumper.go:105:        [INFO]        dumping.table[sbtest.benchyou1].rows[1266054].bytes[256MB].part[2].thread[2]
-
- ...
- [stripped]
- ...
-
- 2017/10/25 13:13:02.939278 dumper.go:182:        [INFO]        dumping.allbytes[1024MB].allrows[5054337].time[10.01sec].rates[102.34MB/sec]...
- 2017/10/25 13:13:35.496439 dumper.go:105:        [INFO]        dumping.table[sbtest.benchyou1].rows[11345659].bytes[2304MB].part[18].thread[2]
- 2017/10/25 13:13:37.627178 dumper.go:105:        [INFO]        dumping.table[sbtest.benchyou0].rows[11974624].bytes[2432MB].part[19].thread[1]
- 2017/10/25 13:13:37.753966 dumper.go:105:        [INFO]        dumping.table[sbtest.benchyou1].rows[11974630].bytes[2432MB].part[19].thread[2]
- 2017/10/25 13:13:39.453430 dumper.go:122:        [INFO]        dumping.table[sbtest.benchyou0].done.allrows[12486842].allbytes[2536MB].thread[1]...
- 2017/10/25 13:13:39.453462 dumper.go:170:        [INFO]        dumping.table[sbtest.benchyou0].datas.thread[1].done...
- 2017/10/25 13:13:39.622390 dumper.go:122:        [INFO]        dumping.table[sbtest.benchyou1].done.allrows[12484135].allbytes[2535MB].thread[2]...
- 2017/10/25 13:13:39.622423 dumper.go:170:        [INFO]        dumping.table[sbtest.benchyou1].datas.thread[2].done...
- 2017/10/25 13:13:39.622454 dumper.go:188:        [INFO]        dumping.all.done.cost[46.69sec].allrows[24970977].allbytes[5318557708].rate[108.63MB/s]
+$ ./bin/mydumper -c conf/mydumper.ini.vitess 
+ 2020/07/13 11:29:55.514476 dumper.go:33:        [INFO]         dumping.database[commerce].schema...
+ 2020/07/13 11:29:55.555823 dumper.go:43:        [INFO]         dumping.table[commerce.corder].schema...
+ 2020/07/13 11:29:55.555970 dumper.go:235:       [INFO]         dumping.table[commerce.corder].datas.thread[0]...
+ 2020/07/13 11:29:55.559696 dumper.go:43:        [INFO]         dumping.table[commerce.customer].schema...
+ 2020/07/13 11:29:55.560089 dumper.go:235:       [INFO]         dumping.table[commerce.customer].datas.thread[1]...
+ 2020/07/13 11:29:55.563361 dumper.go:43:        [INFO]         dumping.table[commerce.product].schema...
+ 2020/07/13 11:29:55.563573 dumper.go:235:       [INFO]         dumping.table[commerce.product].datas.thread[2]...
+ 2020/07/13 11:29:55.565112 dumper.go:142:       [INFO]         dumping.table[commerce.corder].done.allrows[1].allbytes[0MB].thread[0]...
+ 2020/07/13 11:29:55.565183 dumper.go:237:       [INFO]         dumping.table[commerce.corder].datas.thread[0].done...
+ 2020/07/13 11:29:55.568321 dumper.go:142:       [INFO]         dumping.table[commerce.customer].done.allrows[0].allbytes[0MB].thread[1]...
+ 2020/07/13 11:29:55.568356 dumper.go:237:       [INFO]         dumping.table[commerce.customer].datas.thread[1].done...
+ 2020/07/13 11:29:55.570556 dumper.go:142:       [INFO]         dumping.table[commerce.product].done.allrows[1].allbytes[0MB].thread[2]...
+ 2020/07/13 11:29:55.570598 dumper.go:237:       [INFO]         dumping.table[commerce.product].datas.thread[2].done...
+ 2020/07/13 11:29:55.570646 dumper.go:256:       [INFO]         dumping.all.done.cost[0.06sec].allrows[2].allbytes[41].rate[0.00MB/s]
 ```
 
 The dump files:
 ```
-$ ls sbtest.sql/
-metadata                    sbtest.benchyou0.00009.sql  sbtest.benchyou0.00018.sql   sbtest.benchyou1.00006.sql  sbtest.benchyou1.00015.sql
-sbtest.benchyou0.00001.sql  sbtest.benchyou0.00010.sql  sbtest.benchyou0.00019.sql   sbtest.benchyou1.00007.sql  sbtest.benchyou1.00016.sql
-sbtest.benchyou0.00002.sql  sbtest.benchyou0.00011.sql  sbtest.benchyou0.00020.sql   sbtest.benchyou1.00008.sql  sbtest.benchyou1.00017.sql
-sbtest.benchyou0.00003.sql  sbtest.benchyou0.00012.sql  sbtest.benchyou0-schema.sql  sbtest.benchyou1.00009.sql  sbtest.benchyou1.00018.sql
-sbtest.benchyou0.00004.sql  sbtest.benchyou0.00013.sql  sbtest.benchyou1.00001.sql   sbtest.benchyou1.00010.sql  sbtest.benchyou1.00019.sql
-sbtest.benchyou0.00005.sql  sbtest.benchyou0.00014.sql  sbtest.benchyou1.00002.sql   sbtest.benchyou1.00011.sql  sbtest.benchyou1.00020.sql
-sbtest.benchyou0.00006.sql  sbtest.benchyou0.00015.sql  sbtest.benchyou1.00003.sql   sbtest.benchyou1.00012.sql  sbtest.benchyou1-schema.sql
-sbtest.benchyou0.00007.sql  sbtest.benchyou0.00016.sql  sbtest.benchyou1.00004.sql   sbtest.benchyou1.00013.sql  sbtest-schema-create.sql
-sbtest.benchyou0.00008.sql  sbtest.benchyou0.00017.sql  sbtest.benchyou1.00005.sql   sbtest.benchyou1.00014.sql
+ls ./dumper-sql/
+commerce.corder.00001.sql  commerce.corder-schema.sql  commerce.product.00001.sql  commerce.product-schema.sql  commerce-schema-create.sql  metadata
 ```
 
 ### myloader
