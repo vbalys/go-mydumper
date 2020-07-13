@@ -1,0 +1,41 @@
+[mysql]
+# The host to connect to
+host = 127.0.0.1
+# TCP/IP port to conect to
+port = 15306
+# Username with privileges to run the dump
+user = user
+# User password
+password = password
+# Database to dump
+database = commerce
+# Table(s) to dump ;  comment out to dump all tables in database
+table = corder,product
+# Directory to dump files to
+outdir = ./dumper-sql
+# Split tables into chunks of this output file size. This value is in MB
+chunksize = 128
+# Session variables, split by ;
+# vars= "xx=xx;xx=xx;"
+# The workload variable here is required for Vitess to use streaming SELECTs
+vars=set workload=olap;
+
+# Use this to use regexp to control what databases to export. These are optional
+[database]
+# regexp = ^(mysql|sys|information_schema|performance_schema)$
+# As the used regexp lib does not allow for lookarounds, you may use this to invert the whole regexp
+# This option should be refactored as soon as a GPLv3 compliant go-pcre lib is found
+# invert_regexp = on
+
+# Use this to restrict exported data. These are optional
+[where]
+# sample_table1 = created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)
+# sample_table2 = created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)
+
+# Use this to override value returned from tables. These are optional
+[select]
+# user.salt = 'reset salt of all system users'
+# user.password = 'reset password of all system users'
+
+# customer.first_name = CONCAT('Bohu', id)
+# customer.last_name = 'Last'
