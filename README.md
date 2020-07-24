@@ -7,6 +7,7 @@
 
 ***go-mydumper*** is a multi-threaded MySQL backup and restore tool, and it is compatible with [maxbube/mydumper](https://github.com/maxbube/mydumper) in the layout.
 
+This build has been lightly patched to enable using it with [Vitess](https://vitess.io), by running it directly against Vitess vtgate.
 
 ## Build
 
@@ -24,13 +25,13 @@ $ ./bin/myloader -h
 ### mydumper
 
 ```
-./bin/mydumper -h
-Usage: ./bin/mydumper -c conf/mydumper.ini.vitess
+$ ./bin/mydumper -h
+Usage: bin/mydumper -c conf/mydumper.ini.sample
   -c string
-    	config file
+        config file
 
 Examples:
-$ ./bin/mydumper -c conf/mydumper.ini.vitess 
+$ ./bin/mydumper -c conf/mydumper.ini.vitess
  2020/07/13 11:29:55.514476 dumper.go:33:        [INFO]         dumping.database[commerce].schema...
  2020/07/13 11:29:55.555823 dumper.go:43:        [INFO]         dumping.table[commerce.corder].schema...
  2020/07/13 11:29:55.555970 dumper.go:235:       [INFO]         dumping.table[commerce.corder].datas.thread[0]...
@@ -56,20 +57,22 @@ commerce.corder.00001.sql  commerce.corder-schema.sql  commerce.product.00001.sq
 ### myloader
 
 ```
-$ ./bin/myloader --help
-Usage: ./bin/myloader -h [HOST] -P [PORT] -u [USER] -p [PASSWORD] -d  [DIR]
+$ ./bin/myloader -h
+flag needs an argument: -h
+Usage: ./bin/myloader -h [HOST] -P [PORT] -u [USER] -p [PASSWORD] -d [DIR] [-o]
   -P int
-    	TCP/IP port to connect to (default 3306)
+        TCP/IP port to connect to (default 3306)
   -d string
-    	Directory of the dump to import
+        Directory of the dump to import
   -h string
-    	The host to connect to
+        The host to connect to
+  -o    Drop tables if they already exist
   -p string
-    	User password
+        User password
   -t int
-    	Number of threads to use (default 16)
+        Number of threads to use (default 16)
   -u string
-    	Username with privileges to run the loader
+        Username with privileges to run the loader
 
 Examples:
 $./bin/myloader -h 192.168.0.2 -P 3306 -u mock -p mock -d sbtest.sql

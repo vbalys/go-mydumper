@@ -18,6 +18,7 @@ chunksize = 128
 # Session variables, split by ;
 # vars= "xx=xx;xx=xx;"
 # The workload variable here is required for Vitess to use streaming SELECTs
+#   if we don't use streaming selects, we'll run into row limits.
 vars=set workload=olap;
 
 # Use this to use regexp to control what databases to export. These are optional
