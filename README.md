@@ -57,8 +57,7 @@ commerce.corder.00001.sql  commerce.corder-schema.sql  commerce.product.00001.sq
 ### myloader
 
 ```
-$ ./bin/myloader -h
-flag needs an argument: -h
+$ ./bin/myloader
 Usage: ./bin/myloader -h [HOST] -P [PORT] -u [USER] -p [PASSWORD] -d [DIR] [-o]
   -P int
         TCP/IP port to connect to (default 3306)
@@ -75,29 +74,25 @@ Usage: ./bin/myloader -h [HOST] -P [PORT] -u [USER] -p [PASSWORD] -d [DIR] [-o]
         Username with privileges to run the loader
 
 Examples:
-$./bin/myloader -h 192.168.0.2 -P 3306 -u mock -p mock -d sbtest.sql
- 2017/10/25 13:04:17.396002 loader.go:75:         [INFO]        restoring.database[sbtest]
- 2017/10/25 13:04:17.458076 loader.go:99:         [INFO]        restoring.schema[sbtest.benchyou0]
- 2017/10/25 13:04:17.516236 loader.go:99:         [INFO]        restoring.schema[sbtest.benchyou1]
- 2017/10/25 13:04:17.516389 loader.go:115:        [INFO]        restoring.tables[benchyou0].parts[00015].thread[1]
- 2017/10/25 13:04:17.516456 loader.go:115:        [INFO]        restoring.tables[benchyou0].parts[00005].thread[2]
 
-...
-[stripped]
-...
+The normal dump process creates a file with a CREATE DATABASE
+statement, e.g. dumper-sql/commerce-schema-create.sql in the
+above example.  Vitess does not support the CREATE DATABASE
+statement via vtgate, so we need to remove this file first or the
+import via myloader will fail.
 
- 2017/10/25 13:05:27.783560 loader.go:131:        [INFO]        restoring.tables[benchyou1].parts[00005].thread[9].done...
- 2017/10/25 13:05:36.133758 loader.go:181:        [INFO]        restoring.allbytes[4087MB].time[78.62sec].rates[51.99MB/sec]...
- 2017/10/25 13:05:44.759183 loader.go:131:        [INFO]        restoring.tables[benchyou0].parts[00001].thread[3].done...
- 2017/10/25 13:05:46.133728 loader.go:181:        [INFO]        restoring.allbytes[4216MB].time[88.62sec].rates[47.58MB/sec]...
- 2017/10/25 13:05:46.567156 loader.go:131:        [INFO]        restoring.tables[benchyou1].parts[00016].thread[6].done...
- 2017/10/25 13:05:50.612200 loader.go:131:        [INFO]        restoring.tables[benchyou0].parts[00008].thread[10].done...
- 2017/10/25 13:05:51.131155 loader.go:131:        [INFO]        restoring.tables[benchyou0].parts[00014].thread[2].done...
- 2017/10/25 13:05:51.185629 loader.go:131:        [INFO]        restoring.tables[benchyou0].parts[00011].thread[1].done...
- 2017/10/25 13:05:51.836354 loader.go:131:        [INFO]        restoring.tables[benchyou1].parts[00004].thread[0].done...
- 2017/10/25 13:05:52.286931 loader.go:131:        [INFO]        restoring.tables[benchyou1].parts[00006].thread[11].done...
- 2017/10/25 13:05:52.602444 loader.go:131:        [INFO]        restoring.tables[benchyou0].parts[00019].thread[8].done...
- 2017/10/25 13:05:52.602573 loader.go:187:        [INFO]        restoring.all.done.cost[95.09sec].allbytes[5120.00MB].rate[53.85MB/s]
+$ rm -f dumper-sql/commerce-schema-create.sql
+
+$ bin/myloader -h 127.0.0.1 -P 15306 -u root -p root -d dumper-sql
+ 2020/07/24 09:58:22.608272 loader.go:89:        [INFO]         working.table[commerce.corder]
+ 2020/07/24 09:58:22.712048 loader.go:113:       [INFO]         restoring.schema[commerce.corder]
+ 2020/07/24 09:58:22.712091 loader.go:89:        [INFO]         working.table[commerce.product]
+ 2020/07/24 09:58:22.827909 loader.go:113:       [INFO]         restoring.schema[commerce.product]
+ 2020/07/24 09:58:22.828028 loader.go:129:       [INFO]         restoring.tables[commerce.product].parts[00001].thread[2]
+ 2020/07/24 09:58:22.828157 loader.go:129:       [INFO]         restoring.tables[commerce.corder].parts[00001].thread[3]
+ 2020/07/24 09:58:22.861609 loader.go:147:       [INFO]         restoring.tables[commerce.product].parts[00001].thread[2].done...
+ 2020/07/24 09:58:22.861739 loader.go:147:       [INFO]         restoring.tables[commerce.corder].parts[00001].thread[3].done...
+ 2020/07/24 09:58:22.861795 loader.go:204:       [INFO]         restoring.all.done.cost[0.03sec].allbytes[0.00MB].rate[0.00MB/s]
 ```
 
 ## License
