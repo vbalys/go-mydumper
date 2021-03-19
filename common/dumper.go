@@ -220,7 +220,7 @@ func dumpTableCsv(log *xlog.Log, conn *Connection, args *config.Config, database
 					values = append(values, str)
 					rowsize += len(str)
 				default:
-					values = append(values, fmt.Sprintf("\"%s\"", EscapeBytes(v.Raw())))
+					values = append(values, fmt.Sprintf("%s", EscapeBytes(v.Raw())))
 					rowsize += len(v.Raw())
 				}
 			}
@@ -238,6 +238,7 @@ func dumpTableCsv(log *xlog.Log, conn *Connection, args *config.Config, database
 			AssertNil(err)
 			writer = csv.NewWriter(file)
 			writer.Comma = separator
+			writer.Write(headerfields)
 			log.Info("dumping.table[%s.%s].rows[%v].bytes[%vMB].part[%v].thread[%d]", database, table, allRows, (allBytes / 1024 / 1024), fileNo, conn.ID)
 			inserts = inserts[:0]
 			chunkbytes = 0
