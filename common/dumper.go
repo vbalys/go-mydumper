@@ -10,8 +10,10 @@
 package common
 
 import (
+	"encoding/csv"
 	"errors"
 	"fmt"
+	"os"
 	"regexp"
 	"strings"
 	"sync"
@@ -150,8 +152,8 @@ func dumpTable(log *xlog.Log, conn *Connection, args *config.Config, database st
 	log.Info("dumping.table[%s.%s].done.allrows[%v].allbytes[%vMB].thread[%d]...", database, table, allRows, (allBytes / 1024 / 1024), conn.ID)
 }
 
-// Dump a table in TSV format
-func dumpTableTsv(log *xlog.Log, conn *Connection, args *config.Config, database string, table string) {
+// Dump a table in CSV/TSV format
+func dumpTableCsv(log *xlog.Log, conn *Connection, args *config.Config, database string, table string, separator rune) {
 	var allBytes uint64
 	var allRows uint64
 	var where string
@@ -191,7 +193,12 @@ func dumpTableTsv(log *xlog.Log, conn *Connection, args *config.Config, database
 	AssertNil(err)
 
 	fileNo := 1
-	stmtsize := 0
+	file, err := os.Create(fmt.Sprintf("%s/%s.%s.%05d.csv", args.Outdir, database, table, fileNo))
+	AssertNil(err)
+	writer := csv.NewWriter(file)
+	writer.Comma = separator
+	writer.Write(headerfields)
+
 	chunkbytes := 0
 	rows := make([]string, 0, 256)
 	rows = append(rows, strings.Join(headerfields, "\t"))
@@ -201,54 +208,43 @@ func dumpTableTsv(log *xlog.Log, conn *Connection, args *config.Config, database
 		AssertNil(err)
 
 		values := make([]string, 0, 16)
+		rowsize := 0
 		for _, v := range row {
 			if v.Raw() == nil {
 				values = append(values, "NULL")
+				rowsize += 4
 			} else {
 				str := v.String()
 				switch {
 				case v.IsSigned(), v.IsUnsigned(), v.IsFloat(), v.IsIntegral(), v.Type() == querypb.Type_DECIMAL:
 					values = append(values, str)
+					rowsize += len(str)
 				default:
 					values = append(values, fmt.Sprintf("\"%s\"", EscapeBytes(v.Raw())))
+					rowsize += len(v.Raw())
 				}
 			}
 		}
-		r := strings.Join(values, "\t")
-		rows = append(rows, r)
+		writer.Write(values)
+		chunkbytes += rowsize
 
 		allRows++
-		stmtsize += len(r)
-		chunkbytes += len(r)
-		allBytes += uint64(len(r))
-		atomic.AddUint64(&args.Allbytes, uint64(len(r)))
+		atomic.AddUint64(&args.Allbytes, uint64(rowsize))
 		atomic.AddUint64(&args.Allrows, 1)
 
-		if stmtsize >= args.StmtSize {
-			insertone := fmt.Sprintf("%s\n", strings.Join(rows, "\n"))
-			inserts = append(inserts, insertone)
-			rows = rows[:0]
-			stmtsize = 0
-		}
-
 		if (chunkbytes / 1024 / 1024) >= args.ChunksizeInMB {
-			file := fmt.Sprintf("%s/%s.%s.%05d.tsv", args.Outdir, database, table, fileNo)
-			WriteFile(file, strings.Join(inserts, ""))
+			writer.Flush()
+			file, err := os.Create(fmt.Sprintf("%s/%s.%s.%05d.csv", args.Outdir, database, table, fileNo))
+			AssertNil(err)
+			writer = csv.NewWriter(file)
+			writer.Comma = separator
 			log.Info("dumping.table[%s.%s].rows[%v].bytes[%vMB].part[%v].thread[%d]", database, table, allRows, (allBytes / 1024 / 1024), fileNo, conn.ID)
 			inserts = inserts[:0]
 			chunkbytes = 0
 			fileNo++
 		}
 	}
-	if chunkbytes > 0 {
-		if len(rows) > 0 {
-			insertone := fmt.Sprintf("%s\n", strings.Join(rows, "\n"))
-			inserts = append(inserts, insertone)
-		}
-
-		file := fmt.Sprintf("%s/%s.%s.%05d.tsv", args.Outdir, database, table, fileNo)
-		WriteFile(file, strings.Join(inserts, ""))
-	}
+	writer.Flush()
 	err = cursor.Close()
 	AssertNil(err)
 
@@ -348,7 +344,9 @@ func Dumper(log *xlog.Log, args *config.Config) {
 				if args.Format == "mysql" {
 					dumpTable(log, conn, args, database, table)
 				} else if args.Format == "tsv" {
-					dumpTableTsv(log, conn, args, database, table)
+					dumpTableCsv(log, conn, args, database, table, '\t')
+				} else if args.Format == "csv" {
+					dumpTableCsv(log, conn, args, database, table, ',')
 				} else {
 					AssertNil(errors.New("Unknown dump format"))
 				}

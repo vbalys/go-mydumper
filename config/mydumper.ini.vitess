@@ -23,7 +23,8 @@ vars=set workload=olap;
 # Format to dump:
 #  mysql - MySQL inserts (default)
 #  tsv   - TSV format
-format = tsv
+#  csv   - CSV format
+format = mysql
 
 # Use this to use regexp to control what databases to export. These are optional
 [database]
