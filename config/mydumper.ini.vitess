@@ -20,6 +20,10 @@ chunksize = 128
 # The workload variable here is required for Vitess to use streaming SELECTs
 #   if we don't use streaming selects, we'll run into row limits.
 vars=set workload=olap;
+# Format to dump:
+#  mysql - MySQL inserts (default)
+#  tsv   - TSV format
+format = tsv
 
 # Use this to use regexp to control what databases to export. These are optional
 [database]

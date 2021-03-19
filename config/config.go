@@ -33,6 +33,7 @@ type Config struct {
 	Table                string
 	Outdir               string
 	SessionVars          string
+	Format               string
 	Threads              int
 	ChunksizeInMB        int
 	StmtSize             int
@@ -78,6 +79,7 @@ func ParseDumperConfig(file string) (*Config, error) {
 		return nil, errors.New("empty outdir")
 	}
 	sessionVars := cfg.Section("mysql").Key("vars").String()
+	format := cfg.Section("mysql").Key("format").String()
 	chunksizemb, err := cfg.Section("mysql").Key("chunksize").Int()
 	if err != nil {
 		return nil, fmt.Errorf("pasre mysql.chunksize failed")
@@ -137,6 +139,7 @@ func ParseDumperConfig(file string) (*Config, error) {
 	args.Outdir = outdir
 	args.ChunksizeInMB = chunksizemb
 	args.SessionVars = sessionVars
+	args.Format = format
 	args.Threads = 16
 	args.StmtSize = 1000000
 	args.IntervalMs = 10 * 1000
