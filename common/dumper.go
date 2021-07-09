@@ -21,7 +21,6 @@ import (
 	"time"
 
 	"github.com/xelabs/go-mydumper/config"
-	querypb "github.com/xelabs/go-mysqlstack/sqlparser/depends/query"
 	"github.com/xelabs/go-mysqlstack/xlog"
 )
 
@@ -38,9 +37,17 @@ func dumpDatabaseSchema(log *xlog.Log, conn *Connection, args *config.Config, da
 }
 
 func dumpTableSchema(log *xlog.Log, conn *Connection, args *config.Config, database string, table string) {
-	qr, err := conn.Fetch(fmt.Sprintf("SHOW CREATE TABLE `%s`.`%s`", database, table))
+	rows, err := conn.StreamFetch(fmt.Sprintf("SHOW CREATE TABLE `%s`.`%s`", database, table))
 	AssertNil(err)
-	schema := qr.Rows[0][1].String() + ";\n"
+
+	rows.Next()
+	AssertNil(err)
+
+	var tableName, createTable string
+	err = rows.Scan(&tableName, &createTable)
+	AssertNil(err)
+
+	schema := createTable + ";\n"
 
 	file := fmt.Sprintf("%s/%s.%s-schema.sql", args.Outdir, database, table)
 	WriteFile(file, schema)
@@ -55,26 +62,31 @@ func dumpTable(log *xlog.Log, conn *Connection, args *config.Config, database st
 	var selfields []string
 
 	fields := make([]string, 0, 16)
+	fieldTypes := make([]string, 0, 16)
 	{
-		cursor, err := conn.StreamFetch(fmt.Sprintf("SELECT * FROM `%s`.`%s` LIMIT 1", database, table))
+		rows, err := conn.StreamFetch(fmt.Sprintf("SELECT * FROM `%s`.`%s` LIMIT 1", database, table))
 		AssertNil(err)
 
-		flds := cursor.Fields()
-		for _, fld := range flds {
-			log.Debug("dump -- %#v, %s, %s", args.Filters, table, fld.Name)
-			if _, ok := args.Filters[table][fld.Name]; ok {
+		colTypes, err := rows.ColumnTypes()
+		AssertNil(err)
+
+		for _, colType := range colTypes {
+			log.Debug("dump -- %#v, %s, %s", args.Filters, table, colType.Name())
+
+			if _, ok := args.Filters[table][colType.Name()]; ok {
 				continue
 			}
 
-			fields = append(fields, fmt.Sprintf("`%s`", fld.Name))
-			replacement, ok := args.Selects[table][fld.Name]
+			fields = append(fields, fmt.Sprintf("`%s`", colType.Name()))
+			fieldTypes = append(fieldTypes, colType.DatabaseTypeName())
+			replacement, ok := args.Selects[table][colType.Name()]
 			if ok {
-				selfields = append(selfields, fmt.Sprintf("%s AS `%s`", replacement, fld.Name))
+				selfields = append(selfields, fmt.Sprintf("%s AS `%s`", replacement, colType.Name()))
 			} else {
-				selfields = append(selfields, fmt.Sprintf("`%s`", fld.Name))
+				selfields = append(selfields, fmt.Sprintf("`%s`", colType.Name()))
 			}
 		}
-		err = cursor.Close()
+		err = rows.Close()
 		AssertNil(err)
 	}
 
@@ -82,34 +94,57 @@ func dumpTable(log *xlog.Log, conn *Connection, args *config.Config, database st
 		where = fmt.Sprintf(" WHERE %v", v)
 	}
 
-	cursor, err := conn.StreamFetch(fmt.Sprintf("SELECT %s FROM `%s`.`%s` %s", strings.Join(selfields, ", "), database, table, where))
+	rows, err := conn.StreamFetch(fmt.Sprintf("SELECT %s FROM `%s`.`%s` %s", strings.Join(selfields, ", "), database, table, where))
 	AssertNil(err)
 
 	fileNo := 1
 	stmtsize := 0
+
+	colNames, err := rows.Columns()
+	AssertNil(err)
+	cols := make([]interface{}, len(colNames))
+	colPtrs := make([]interface{}, len(colNames))
+	for i := 0; i < len(colNames); i++ {
+		colPtrs[i] = &cols[i]
+	}
+
 	chunkbytes := 0
-	rows := make([]string, 0, 256)
+	outputRows := make([]string, 0, 256)
 	inserts := make([]string, 0, 256)
-	for cursor.Next() {
-		row, err := cursor.RowValues()
+	for rows.Next() {
+		err := rows.Scan(colPtrs...)
 		AssertNil(err)
 
 		values := make([]string, 0, 16)
-		for _, v := range row {
-			if v.Raw() == nil {
+		rowsize := 3  // start and end paren plus newline
+		for i, col := range cols {
+			colKind := fieldTypes[i]
+			if col == nil || colKind == "NULL" {
 				values = append(values, "NULL")
+				rowsize += 4
 			} else {
-				str := v.String()
-				switch {
-				case v.IsSigned(), v.IsUnsigned(), v.IsFloat(), v.IsIntegral(), v.Type() == querypb.Type_DECIMAL:
+				switch colKind {
+				case "BIGINT", "INT", "SMALLINT", "MEDIUMINT", "TINYINT", "DECIMAL", "FLOAT":
+					str := fmt.Sprintf("%s", col)
 					values = append(values, str)
+					rowsize += len(str)
+				case "CHAR", "VARCHAR", "TEXT", "LONGTEXT", "MEDIUMTEXT", "TINYTEXT":
+					byteCol := col.([]byte)
+					values = append(values, fmt.Sprintf(`"%s"`, EscapeBytes(byteCol)))
+					rowsize += len(byteCol) + 2
 				default:
-					values = append(values, fmt.Sprintf("\"%s\"", EscapeBytes(v.Raw())))
+					// TODO:  check/test the following types
+					// "BINARY" "BIT" "BLOB" "DATE" "DATETIME" "DOUBLE" "ENUM" "GEOMETRY"
+					// "JSON" "LONGBLOB" "MEDIUMBLOB" "SET" "TIME" "TIMESTAMP" "TINYBLOB"
+					// "VARBINARY" "YEAR"
+					byteCol := col.([]byte)
+					values = append(values, fmt.Sprintf(`"%s"`, EscapeBytes(byteCol)))
+					rowsize += len(byteCol) + 2
 				}
 			}
 		}
 		r := "(" + strings.Join(values, ",") + ")"
-		rows = append(rows, r)
+		outputRows = append(outputRows, r)
 
 		allRows++
 		stmtsize += len(r)
@@ -119,9 +154,9 @@ func dumpTable(log *xlog.Log, conn *Connection, args *config.Config, database st
 		atomic.AddUint64(&args.Allrows, 1)
 
 		if stmtsize >= args.StmtSize {
-			insertone := fmt.Sprintf("INSERT INTO `%s`(%s) VALUES\n%s", table, strings.Join(fields, ","), strings.Join(rows, ",\n"))
+			insertone := fmt.Sprintf("INSERT INTO `%s`(%s) VALUES\n%s", table, strings.Join(fields, ","), strings.Join(outputRows, ",\n"))
 			inserts = append(inserts, insertone)
-			rows = rows[:0]
+			outputRows = outputRows[:0]
 			stmtsize = 0
 		}
 
@@ -130,15 +165,15 @@ func dumpTable(log *xlog.Log, conn *Connection, args *config.Config, database st
 			file := fmt.Sprintf("%s/%s.%s.%05d.sql", args.Outdir, database, table, fileNo)
 			WriteFile(file, query)
 
-			log.Info("dumping.table[%s.%s].rows[%v].bytes[%vMB].part[%v].thread[%d]", database, table, allRows, (allBytes / 1024 / 1024), fileNo, conn.ID)
+			log.Info("dumping.table[%s.%s].rows[%v].bytes[%vMB].part[%v].thread[%d]", database, table, allRows, allBytes / 1024 / 1024, fileNo, conn.ID)
 			inserts = inserts[:0]
 			chunkbytes = 0
 			fileNo++
 		}
 	}
 	if chunkbytes > 0 {
-		if len(rows) > 0 {
-			insertone := fmt.Sprintf("INSERT INTO `%s`(%s) VALUES\n%s", table, strings.Join(fields, ","), strings.Join(rows, ",\n"))
+		if len(outputRows) > 0 {
+			insertone := fmt.Sprintf("INSERT INTO `%s`(%s) VALUES\n%s", table, strings.Join(fields, ","), strings.Join(outputRows, ",\n"))
 			inserts = append(inserts, insertone)
 		}
 
@@ -146,13 +181,14 @@ func dumpTable(log *xlog.Log, conn *Connection, args *config.Config, database st
 		file := fmt.Sprintf("%s/%s.%s.%05d.sql", args.Outdir, database, table, fileNo)
 		WriteFile(file, query)
 	}
-	err = cursor.Close()
+	err = rows.Close()
 	AssertNil(err)
 
-	log.Info("dumping.table[%s.%s].done.allrows[%v].allbytes[%vMB].thread[%d]...", database, table, allRows, (allBytes / 1024 / 1024), conn.ID)
+	log.Info("dumping.table[%s.%s].done.allrows[%v].allbytes[%vMB].thread[%d]...", database, table, allRows, allBytes / 1024 / 1024, conn.ID)
 }
 
 // Dump a table in CSV/TSV format
+// TODO: fix to be similar to MySQL dump format (use ColumType)
 func dumpTableCsv(log *xlog.Log, conn *Connection, args *config.Config, database string, table string, separator rune) {
 	var allBytes uint64
 	var allRows uint64
@@ -161,27 +197,32 @@ func dumpTableCsv(log *xlog.Log, conn *Connection, args *config.Config, database
 	var headerfields []string
 
 	fields := make([]string, 0, 16)
+	fieldTypes := make([]string, 0, 16)
 	{
-		cursor, err := conn.StreamFetch(fmt.Sprintf("SELECT * FROM `%s`.`%s` LIMIT 1", database, table))
+		rows, err := conn.StreamFetch(fmt.Sprintf("SELECT * FROM `%s`.`%s` LIMIT 1", database, table))
 		AssertNil(err)
 
-		flds := cursor.Fields()
-		for _, fld := range flds {
-			log.Debug("dump -- %#v, %s, %s", args.Filters, table, fld.Name)
-			if _, ok := args.Filters[table][fld.Name]; ok {
+		colTypes, err := rows.ColumnTypes()
+		AssertNil(err)
+
+		for _, colType := range colTypes {
+			log.Debug("dump -- %#v, %s, %s", args.Filters, table, colType.Name())
+
+			if _, ok := args.Filters[table][colType.Name()]; ok {
 				continue
 			}
 
-			fields = append(fields, fmt.Sprintf("`%s`", fld.Name))
-			headerfields = append(headerfields, fld.Name)
-			replacement, ok := args.Selects[table][fld.Name]
+			fields = append(fields, fmt.Sprintf("`%s`", colType.Name()))
+			fieldTypes = append(fieldTypes, colType.DatabaseTypeName())
+			headerfields = append(headerfields, colType.Name())
+			replacement, ok := args.Selects[table][colType.Name()]
 			if ok {
-				selfields = append(selfields, fmt.Sprintf("%s AS `%s`", replacement, fld.Name))
+				selfields = append(selfields, fmt.Sprintf("%s AS `%s`", replacement, colType.Name()))
 			} else {
-				selfields = append(selfields, fmt.Sprintf("`%s`", fld.Name))
+				selfields = append(selfields, fmt.Sprintf("`%s`", colType.Name()))
 			}
 		}
-		err = cursor.Close()
+		err = rows.Close()
 		AssertNil(err)
 	}
 
@@ -189,7 +230,7 @@ func dumpTableCsv(log *xlog.Log, conn *Connection, args *config.Config, database
 		where = fmt.Sprintf(" WHERE %v", v)
 	}
 
-	cursor, err := conn.StreamFetch(fmt.Sprintf("SELECT %s FROM `%s`.`%s` %s", strings.Join(selfields, ", "), database, table, where))
+	rows, err := conn.StreamFetch(fmt.Sprintf("SELECT %s FROM `%s`.`%s` %s", strings.Join(selfields, ", "), database, table, where))
 	AssertNil(err)
 
 	fileNo := 1
@@ -199,29 +240,47 @@ func dumpTableCsv(log *xlog.Log, conn *Connection, args *config.Config, database
 	writer.Comma = separator
 	writer.Write(headerfields)
 
+	colNames, err := rows.Columns()
+	AssertNil(err)
+	cols := make([]interface{}, len(colNames))
+	colPtrs := make([]interface{}, len(colNames))
+	for i := 0; i < len(colNames); i++ {
+		colPtrs[i] = &cols[i]
+	}
+
 	chunkbytes := 0
-	rows := make([]string, 0, 256)
-	rows = append(rows, strings.Join(headerfields, "\t"))
+	outputRows := make([]string, 0, 256)
+	outputRows = append(outputRows, strings.Join(headerfields, "\t"))
 	inserts := make([]string, 0, 256)
-	for cursor.Next() {
-		row, err := cursor.RowValues()
+	for rows.Next() {
+		err := rows.Scan(colPtrs...)
 		AssertNil(err)
 
 		values := make([]string, 0, 16)
-		rowsize := 0
-		for _, v := range row {
-			if v.Raw() == nil {
+		rowsize := 3  // start and end paren plus newline
+		for i, col := range cols {
+			colKind := fieldTypes[i]
+			if col == nil || colKind == "NULL" {
 				values = append(values, "NULL")
 				rowsize += 4
 			} else {
-				str := v.String()
-				switch {
-				case v.IsSigned(), v.IsUnsigned(), v.IsFloat(), v.IsIntegral(), v.Type() == querypb.Type_DECIMAL:
+				switch colKind {
+				case "BIGINT", "INT", "SMALLINT", "MEDIUMINT", "TINYINT", "DECIMAL", "FLOAT":
+					str := fmt.Sprintf("%s", col)
 					values = append(values, str)
 					rowsize += len(str)
+				case "CHAR", "VARCHAR", "TEXT", "LONGTEXT", "MEDIUMTEXT", "TINYTEXT":
+					byteCol := col.([]byte)
+					values = append(values, fmt.Sprintf(`"%s"`, EscapeBytes(byteCol)))
+					rowsize += len(byteCol) + 2
 				default:
-					values = append(values, fmt.Sprintf("%s", EscapeBytes(v.Raw())))
-					rowsize += len(v.Raw())
+					// TODO:  check/test the following types
+					// "BINARY" "BIT" "BLOB" "DATE" "DATETIME" "DOUBLE" "ENUM" "GEOMETRY"
+					// "JSON" "LONGBLOB" "MEDIUMBLOB" "SET" "TIME" "TIMESTAMP" "TINYBLOB"
+					// "VARBINARY" "YEAR"
+					byteCol := col.([]byte)
+					values = append(values, fmt.Sprintf(`"%s"`, EscapeBytes(byteCol)))
+					rowsize += len(byteCol) + 2
 				}
 			}
 		}
@@ -239,49 +298,56 @@ func dumpTableCsv(log *xlog.Log, conn *Connection, args *config.Config, database
 			writer = csv.NewWriter(file)
 			writer.Comma = separator
 			writer.Write(headerfields)
-			log.Info("dumping.table[%s.%s].rows[%v].bytes[%vMB].part[%v].thread[%d]", database, table, allRows, (allBytes / 1024 / 1024), fileNo, conn.ID)
+			log.Info("dumping.table[%s.%s].rows[%v].bytes[%vMB].part[%v].thread[%d]", database, table, allRows, allBytes / 1024 / 1024, fileNo, conn.ID)
 			inserts = inserts[:0]
 			chunkbytes = 0
 			fileNo++
 		}
 	}
 	writer.Flush()
-	err = cursor.Close()
+	err = rows.Close()
 	AssertNil(err)
 
-	log.Info("dumping.table[%s.%s].done.allrows[%v].allbytes[%vMB].thread[%d]...", database, table, allRows, (allBytes / 1024 / 1024), conn.ID)
+	log.Info("dumping.table[%s.%s].done.allrows[%v].allbytes[%vMB].thread[%d]...", database, table, allRows, allBytes / 1024 / 1024, conn.ID)
 }
 
 func allTables(log *xlog.Log, conn *Connection, database string) []string {
-	qr, err := conn.Fetch(fmt.Sprintf("SHOW TABLES FROM `%s`", database))
+	rows, err := conn.StreamFetch(fmt.Sprintf("SHOW TABLES FROM `%s`", database))
 	AssertNil(err)
 
 	tables := make([]string, 0, 128)
-	for _, t := range qr.Rows {
-		tables = append(tables, t[0].String())
+	for rows.Next() {
+		var tableName string
+		err = rows.Scan(&tableName)
+		tables = append(tables, tableName)
 	}
+	fmt.Printf("tables: %v\n", tables)
 	return tables
 }
 
 func allDatabases(log *xlog.Log, conn *Connection) []string {
-	qr, err := conn.Fetch("SHOW DATABASES")
+	rows, err := conn.StreamFetch("SHOW DATABASES")
 	AssertNil(err)
 
 	databases := make([]string, 0, 128)
-	for _, t := range qr.Rows {
-		databases = append(databases, t[0].String())
+	for rows.Next() {
+		var databaseName string
+		err = rows.Scan(&databaseName)
+		databases = append(databases, databaseName)
 	}
 	return databases
 }
 
 func filterDatabases(log *xlog.Log, conn *Connection, filter *regexp.Regexp, invert bool) []string {
-	qr, err := conn.Fetch("SHOW DATABASES")
+	rows, err := conn.StreamFetch("SHOW DATABASES")
 	AssertNil(err)
 
 	databases := make([]string, 0, 128)
-	for _, t := range qr.Rows {
-		if (!invert && filter.MatchString(t[0].String())) || (invert && !filter.MatchString(t[0].String())) {
-			databases = append(databases, t[0].String())
+	for rows.Next() {
+		var databaseName string
+		err = rows.Scan(&databaseName)
+		if (!invert && filter.MatchString(databaseName)) || (invert && !filter.MatchString(databaseName)) {
+			databases = append(databases, databaseName)
 		}
 	}
 	return databases
@@ -342,14 +408,14 @@ func Dumper(log *xlog.Log, args *config.Config) {
 					pool.Put(conn)
 				}()
 				log.Info("dumping.table[%s.%s].datas.thread[%d]...", database, table, conn.ID)
-				if args.Format == "mysql" {
+				if args.Format == "mysql" || args.Format == "" {
 					dumpTable(log, conn, args, database, table)
 				} else if args.Format == "tsv" {
 					dumpTableCsv(log, conn, args, database, table, '\t')
 				} else if args.Format == "csv" {
 					dumpTableCsv(log, conn, args, database, table, ',')
 				} else {
-					AssertNil(errors.New("Unknown dump format"))
+					AssertNil(errors.New(fmt.Sprintf("unknown dump format: [%v]", args.Format)))
 				}
 
 				log.Info("dumping.table[%s.%s].datas.thread[%d].done...", database, table, conn.ID)
@@ -371,5 +437,5 @@ func Dumper(log *xlog.Log, args *config.Config) {
 
 	wg.Wait()
 	elapsed := time.Since(t).Seconds()
-	log.Info("dumping.all.done.cost[%.2fsec].allrows[%v].allbytes[%v].rate[%.2fMB/s]", elapsed, args.Allrows, args.Allbytes, (float64(args.Allbytes/1024/1024) / elapsed))
+	log.Info("dumping.all.done.cost[%.2fsec].allrows[%v].allbytes[%v].rate[%.2fMB/s]", elapsed, args.Allrows, args.Allbytes, float64(args.Allbytes/1024/1024) / elapsed)
 }

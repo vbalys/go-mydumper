@@ -52,9 +52,6 @@ func TestPool(t *testing.T) {
 					err := conn.Execute("select 1")
 					assert.Nil(t, err)
 
-					_, err = conn.Fetch("select 1")
-					assert.Nil(t, err)
-
 					_, err = conn.StreamFetch("select 1")
 					assert.Nil(t, err)
 
@@ -75,9 +72,6 @@ func TestPool(t *testing.T) {
 				default:
 					conn := pool.Get()
 					conn.Execute("select 2")
-					assert.Nil(t, err)
-
-					conn.Fetch("select 2")
 					assert.Nil(t, err)
 
 					_, err = conn.StreamFetch("select 1")

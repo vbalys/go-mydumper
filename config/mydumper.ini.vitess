@@ -15,11 +15,15 @@ table = corder,product
 outdir = ./dumper-sql
 # Split tables into chunks of this output file size. This value is in MB
 chunksize = 128
-# Session variables, split by ;
-# vars= "xx=xx;xx=xx;"
+# Session variables, split by &
+# initvars= "xx=xx&xx=xx"
+# vars= "xx=xx&xx=xx"
+# initvars are for the initial metadata-only retrieval phase, does not need
+# or want streaming SELECTs
+initvars=tls=skip-verify
 # The workload variable here is required for Vitess to use streaming SELECTs
 #   if we don't use streaming selects, we'll run into row limits.
-vars=set workload=olap;
+vars=workload=olap&tls=skip-verify
 # Format to dump:
 #  mysql - MySQL inserts (default)
 #  tsv   - TSV format

@@ -10,12 +10,11 @@
 package common
 
 import (
-	"sync"
-
-	"github.com/xelabs/go-mysqlstack/driver"
+	"database/sql"
+	_ "github.com/go-sql-driver/mysql"
+	_ "github.com/xelabs/go-mysqlstack/sqlparser/depends/sqltypes"
 	"github.com/xelabs/go-mysqlstack/xlog"
-
-	"github.com/xelabs/go-mysqlstack/sqlparser/depends/sqltypes"
+	"sync"
 )
 
 // Pool tuple.
@@ -28,36 +27,40 @@ type Pool struct {
 // Connection tuple.
 type Connection struct {
 	ID     int
-	client driver.Conn
+	client *sql.DB
 }
 
 // Execute used to executes the query.
 func (conn *Connection) Execute(query string) error {
-	return conn.client.Exec(query)
-}
-
-// Fetch used to fetch the results.
-func (conn *Connection) Fetch(query string) (*sqltypes.Result, error) {
-	return conn.client.FetchAll(query, -1)
+	_, err := conn.client.Query(query)
+	return err
 }
 
 // StreamFetch used to the results with streaming.
-func (conn *Connection) StreamFetch(query string) (driver.Rows, error) {
+func (conn *Connection) StreamFetch(query string) (*sql.Rows, error) {
 	return conn.client.Query(query)
 }
 
 // NewPool creates the new pool.
 func NewPool(log *xlog.Log, cap int, address string, user string, password string, vars string, database string) (*Pool, error) {
 	conns := make(chan *Connection, cap)
-	for i := 0; i < cap; i++ {
-		client, err := driver.NewConn(user, password, address, database, "utf8")
+	var client *sql.DB
+	var err error
+	if vars != "" {
+		client, err = sql.Open("mysql", user+":"+password+"@tcp("+address+")/"+database+"?charset=utf8mb4&"+vars)
 		if err != nil {
 			return nil, err
 		}
-		conn := &Connection{ID: i, client: client}
-		if vars != "" {
-			conn.Execute(vars)
+	} else {
+		client, err = sql.Open("mysql", user+":"+password+"@tcp("+address+")/"+database+"?charset=utf8mb4")
+		if err != nil {
+			return nil, err
 		}
+	}
+	for i := 0; i < cap; i++ {
+		// TODO: make the charset configurable
+		client.SetMaxOpenConns(cap)
+		conn := &Connection{ID: i, client: client}
 		conns <- conn
 	}
 
