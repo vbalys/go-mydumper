@@ -188,7 +188,6 @@ func dumpTable(log *xlog.Log, conn *Connection, args *config.Config, database st
 }
 
 // Dump a table in CSV/TSV format
-// TODO: fix to be similar to MySQL dump format (use ColumType)
 func dumpTableCsv(log *xlog.Log, conn *Connection, args *config.Config, database string, table string, separator rune) {
 	var allBytes uint64
 	var allRows uint64
@@ -265,21 +264,19 @@ func dumpTableCsv(log *xlog.Log, conn *Connection, args *config.Config, database
 				rowsize += 4
 			} else {
 				switch colKind {
+				// TODO: what about, e.g., quote escaping?
 				case "BIGINT", "INT", "SMALLINT", "MEDIUMINT", "TINYINT", "DECIMAL", "FLOAT":
 					str := fmt.Sprintf("%s", col)
 					values = append(values, str)
 					rowsize += len(str)
-				case "CHAR", "VARCHAR", "TEXT", "LONGTEXT", "MEDIUMTEXT", "TINYTEXT":
-					byteCol := col.([]byte)
-					values = append(values, fmt.Sprintf(`"%s"`, EscapeBytes(byteCol)))
-					rowsize += len(byteCol) + 2
 				default:
 					// TODO:  check/test the following types
 					// "BINARY" "BIT" "BLOB" "DATE" "DATETIME" "DOUBLE" "ENUM" "GEOMETRY"
 					// "JSON" "LONGBLOB" "MEDIUMBLOB" "SET" "TIME" "TIMESTAMP" "TINYBLOB"
 					// "VARBINARY" "YEAR"
+					// "CHAR", "VARCHAR", "TEXT", "LONGTEXT", "MEDIUMTEXT", "TINYTEXT"
 					byteCol := col.([]byte)
-					values = append(values, fmt.Sprintf(`"%s"`, EscapeBytes(byteCol)))
+					values = append(values, fmt.Sprintf("%s", EscapeBytes(byteCol)))
 					rowsize += len(byteCol) + 2
 				}
 			}
