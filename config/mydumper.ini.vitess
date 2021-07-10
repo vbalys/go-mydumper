@@ -1,4 +1,6 @@
 [mysql]
+# Number of dumping threads
+threads = 4
 # The host to connect to
 host = 127.0.0.1
 # TCP/IP port to conect to
