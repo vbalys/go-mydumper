@@ -30,6 +30,7 @@ func TestPool(t *testing.T) {
 
 	// fakedbs.
 	{
+		fakedbs.AddQueryPattern("set names .*", &sqltypes.Result{})
 		fakedbs.AddQueryPattern("select .*", &sqltypes.Result{})
 	}
 
@@ -49,11 +50,11 @@ func TestPool(t *testing.T) {
 					return
 				default:
 					conn := pool.Get()
-					err := conn.Execute("select 1")
+					rows, err := conn.StreamFetch("select 1")
 					assert.Nil(t, err)
-
-					_, err = conn.StreamFetch("select 1")
-					assert.Nil(t, err)
+					if rows != nil {
+						rows.Close()
+					}
 
 					pool.Put(conn)
 				}
@@ -71,11 +72,11 @@ func TestPool(t *testing.T) {
 					return
 				default:
 					conn := pool.Get()
-					conn.Execute("select 2")
+					rows, err := conn.StreamFetch("select 1")
 					assert.Nil(t, err)
-
-					_, err = conn.StreamFetch("select 1")
-					assert.Nil(t, err)
+					if rows != nil {
+						rows.Close()
+					}
 
 					pool.Put(conn)
 				}

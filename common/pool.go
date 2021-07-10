@@ -30,12 +30,6 @@ type Connection struct {
 	client *sql.DB
 }
 
-// Execute used to executes the query.
-func (conn *Connection) Execute(query string) error {
-	_, err := conn.client.Query(query)
-	return err
-}
-
 // StreamFetch used to the results with streaming.
 func (conn *Connection) StreamFetch(query string) (*sql.Rows, error) {
 	return conn.client.Query(query)

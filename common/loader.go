@@ -72,9 +72,12 @@ func restoreDatabaseSchema(log *xlog.Log, dbs []string, conn *Connection) {
 		AssertNil(err)
 		sql := common.BytesToString(data)
 
-		err = conn.Execute(sql)
+		rows, err := conn.StreamFetch(sql)
 		AssertNil(err)
 		log.Info("restoring.database[%s]", name)
+		if rows != nil {
+			rows.Close()
+		}
 	}
 }
 
@@ -89,11 +92,17 @@ func restoreTableSchema(log *xlog.Log, overwrite bool, tables []string, conn *Co
 
 		log.Info("working.table[%s.%s]", db, tbl)
 
-		err := conn.Execute(fmt.Sprintf("USE `%s`", db))
+		rows, err := conn.StreamFetch(fmt.Sprintf("USE `%s`", db))
 		AssertNil(err)
+		if rows != nil {
+			rows.Close()
+		}
 
-		err = conn.Execute("SET FOREIGN_KEY_CHECKS=0")
+		rows, err = conn.StreamFetch("SET FOREIGN_KEY_CHECKS=0")
 		AssertNil(err)
+		if rows != nil {
+			rows.Close()
+		}
 
 		data, err := ReadFile(table)
 		AssertNil(err)
@@ -104,11 +113,17 @@ func restoreTableSchema(log *xlog.Log, overwrite bool, tables []string, conn *Co
 				if overwrite {
 					log.Info("drop(overwrite.is.true).table[%s.%s]", db, tbl)
 					dropQuery := fmt.Sprintf("DROP TABLE IF EXISTS %s", name)
-					err = conn.Execute(dropQuery)
+					rows, err := conn.StreamFetch(dropQuery)
 					AssertNil(err)
+					if rows != nil {
+						rows.Close()
+					}
 				}
-				err = conn.Execute(query)
+				rows, err := conn.StreamFetch(query)
 				AssertNil(err)
+				if rows != nil {
+					rows.Close()
+				}
 			}
 		}
 		log.Info("restoring.schema[%s.%s]", db, tbl)
@@ -128,11 +143,17 @@ func restoreTable(log *xlog.Log, table string, conn *Connection) int {
 	}
 
 	log.Info("restoring.tables[%s.%s].parts[%s].thread[%d]", db, tbl, part, conn.ID)
-	err := conn.Execute(fmt.Sprintf("USE `%s`", db))
+	rows, err := conn.StreamFetch(fmt.Sprintf("USE `%s`", db))
 	AssertNil(err)
+	if rows != nil {
+		rows.Close()
+	}
 
-	err = conn.Execute("SET FOREIGN_KEY_CHECKS=0")
+	rows, err = conn.StreamFetch("SET FOREIGN_KEY_CHECKS=0")
 	AssertNil(err)
+	if rows != nil {
+		rows.Close()
+	}
 
 	data, err := ReadFile(table)
 	AssertNil(err)
@@ -141,8 +162,11 @@ func restoreTable(log *xlog.Log, table string, conn *Connection) int {
 	bytes = len(query1)
 	for _, query := range querys {
 		if !strings.HasPrefix(query, "/*") && query != "" {
-			err = conn.Execute(query)
+			rows, err := conn.StreamFetch(query)
 			AssertNil(err)
+			if rows != nil {
+				rows.Close()
+			}
 		}
 	}
 	log.Info("restoring.tables[%s.%s].parts[%s].thread[%d].done...", db, tbl, part, conn.ID)
@@ -151,7 +175,7 @@ func restoreTable(log *xlog.Log, table string, conn *Connection) int {
 
 // Loader used to start the loader worker.
 func Loader(log *xlog.Log, args *config.Config) {
-	pool, err := NewPool(log, args.Threads, args.Address, args.User, args.Password, args.SessionVars, "")
+	pool, err := NewPool(log, args.Threads, args.Address, args.User, args.Password, "", "")
 	AssertNil(err)
 	defer pool.Close()
 

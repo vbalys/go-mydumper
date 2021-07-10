@@ -39,13 +39,12 @@ func dumpDatabaseSchema(log *xlog.Log, conn *Connection, args *config.Config, da
 func dumpTableSchema(log *xlog.Log, conn *Connection, args *config.Config, database string, table string) {
 	rows, err := conn.StreamFetch(fmt.Sprintf("SHOW CREATE TABLE `%s`.`%s`", database, table))
 	AssertNil(err)
-
 	rows.Next()
-	AssertNil(err)
 
 	var tableName, createTable string
 	err = rows.Scan(&tableName, &createTable)
 	AssertNil(err)
+	rows.Close()
 
 	schema := createTable + ";\n"
 
@@ -335,6 +334,7 @@ func allDatabases(log *xlog.Log, conn *Connection) []string {
 		err = rows.Scan(&databaseName)
 		databases = append(databases, databaseName)
 	}
+	rows.Close()
 	return databases
 }
 
@@ -350,6 +350,7 @@ func filterDatabases(log *xlog.Log, conn *Connection, filter *regexp.Regexp, inv
 			databases = append(databases, databaseName)
 		}
 	}
+	rows.Close()
 	return databases
 }
 
