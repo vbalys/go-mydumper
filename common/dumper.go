@@ -264,9 +264,12 @@ func dumpTableCsv(log *xlog.Log, conn *Connection, args *config.Config, database
 				rowsize += 4
 			} else {
 				switch colKind {
-				// TODO: what about, e.g., quote escaping?
 				case "BIGINT", "INT", "SMALLINT", "MEDIUMINT", "TINYINT", "DECIMAL", "FLOAT":
 					str := fmt.Sprintf("%s", col)
+					values = append(values, str)
+					rowsize += len(str)
+				case "CHAR", "VARCHAR", "TEXT", "LONGTEXT", "MEDIUMTEXT", "TINYTEXT":
+					str := fmt.Sprintf(`%s`, col)
 					values = append(values, str)
 					rowsize += len(str)
 				default:
@@ -274,7 +277,6 @@ func dumpTableCsv(log *xlog.Log, conn *Connection, args *config.Config, database
 					// "BINARY" "BIT" "BLOB" "DATE" "DATETIME" "DOUBLE" "ENUM" "GEOMETRY"
 					// "JSON" "LONGBLOB" "MEDIUMBLOB" "SET" "TIME" "TIMESTAMP" "TINYBLOB"
 					// "VARBINARY" "YEAR"
-					// "CHAR", "VARCHAR", "TEXT", "LONGTEXT", "MEDIUMTEXT", "TINYTEXT"
 					byteCol := col.([]byte)
 					values = append(values, fmt.Sprintf("%s", EscapeBytes(byteCol)))
 					rowsize += len(byteCol) + 2
@@ -289,7 +291,9 @@ func dumpTableCsv(log *xlog.Log, conn *Connection, args *config.Config, database
 		atomic.AddUint64(&args.Allrows, 1)
 
 		if (chunkbytes / 1024 / 1024) >= args.ChunksizeInMB {
+			log.Info("dumping.table[%s.%s].rows[%v].bytes[%vMB].part[%v].thread[%d]", database, table, allRows, allBytes / 1024 / 1024, fileNo, conn.ID)
 			writer.Flush()
+			fileNo++
 			file, err := os.Create(fmt.Sprintf("%s/%s.%s.%05d.csv", args.Outdir, database, table, fileNo))
 			AssertNil(err)
 			writer = csv.NewWriter(file)
@@ -298,7 +302,6 @@ func dumpTableCsv(log *xlog.Log, conn *Connection, args *config.Config, database
 			log.Info("dumping.table[%s.%s].rows[%v].bytes[%vMB].part[%v].thread[%d]", database, table, allRows, allBytes / 1024 / 1024, fileNo, conn.ID)
 			inserts = inserts[:0]
 			chunkbytes = 0
-			fileNo++
 		}
 	}
 	writer.Flush()
