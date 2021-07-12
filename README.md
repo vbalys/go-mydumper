@@ -14,7 +14,7 @@ This build has been lightly patched to enable using it with [Vitess](https://vit
 ```
 $ git clone https://github.com/aquarapid/go-mydumper
 $ cd go-mydumper
-$ git checkout jacques_vitess
+$ git checkout jg_vitess_tls
 $ make build
 $ ./bin/mydumper -h
 $ ./bin/myloader -h
@@ -31,7 +31,7 @@ Usage: bin/mydumper -c conf/mydumper.ini.sample
         config file
 
 Examples:
-$ ./bin/mydumper -c conf/mydumper.ini.vitess
+$ ./bin/mydumper -c config/mydumper.ini.vitess
  2020/07/13 11:29:55.514476 dumper.go:33:        [INFO]         dumping.database[commerce].schema...
  2020/07/13 11:29:55.555823 dumper.go:43:        [INFO]         dumping.table[commerce.corder].schema...
  2020/07/13 11:29:55.555970 dumper.go:235:       [INFO]         dumping.table[commerce.corder].datas.thread[0]...
@@ -94,6 +94,13 @@ $ bin/myloader -h 127.0.0.1 -P 15306 -u root -p root -d dumper-sql
  2020/07/24 09:58:22.861739 loader.go:147:       [INFO]         restoring.tables[commerce.corder].parts[00001].thread[3].done...
  2020/07/24 09:58:22.861795 loader.go:204:       [INFO]         restoring.all.done.cost[0.03sec].allbytes[0.00MB].rate[0.00MB/s]
 ```
+
+## Known issues
+
+  * Note that there is a known issue in Vitess
+  (https://github.com/vitessio/vitess/issues/8447) where, if you have query
+  logging enabled, your bulk data load via `myloader` might use significantly
+  more memory for you `vtgate` and/or `vttablet` than you might expect.
 
 ## License
 
