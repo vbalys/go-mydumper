@@ -22,10 +22,11 @@ chunksize = 128
 # vars= "xx=xx&xx=xx"
 # initvars are for the initial metadata-only retrieval phase, does not need
 # or want streaming SELECTs
-initvars=tls=skip-verify
+# Adjust the charset as required
+initvars=tls=skip-verify&charset=utf8mb4
 # The workload variable here is required for Vitess to use streaming SELECTs
 #   if we don't use streaming selects, we'll run into row limits.
-vars=workload=olap&tls=skip-verify
+vars=tls=skip-verify&charset=utf8mb4&workload=olap
 # Format to dump:
 #  mysql - MySQL inserts (default)
 #  tsv   - TSV format

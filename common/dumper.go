@@ -356,7 +356,7 @@ func filterDatabases(log *xlog.Log, conn *Connection, filter *regexp.Regexp, inv
 
 // Dumper used to start the dumper worker.
 func Dumper(log *xlog.Log, args *config.Config) {
-	initPool, err := NewPool(log, args.Threads, args.Address, args.User, args.Password, "", "")
+	initPool, err := NewPool(log, args.Threads, args.Address, args.User, args.Password, args.InitVars, "")
 	AssertNil(err)
 	defer initPool.Close()
 

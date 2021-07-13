@@ -41,18 +41,17 @@ func NewPool(log *xlog.Log, cap int, address string, user string, password strin
 	var client *sql.DB
 	var err error
 	if vars != "" {
-		client, err = sql.Open("mysql", user+":"+password+"@tcp("+address+")/"+database+"?charset=utf8mb4&"+vars)
+		client, err = sql.Open("mysql", user+":"+password+"@tcp("+address+")/"+database+"?"+vars)
 		if err != nil {
 			return nil, err
 		}
 	} else {
-		client, err = sql.Open("mysql", user+":"+password+"@tcp("+address+")/"+database+"?charset=utf8mb4")
+		client, err = sql.Open("mysql", user+":"+password+"@tcp("+address+")/"+database)
 		if err != nil {
 			return nil, err
 		}
 	}
 	for i := 0; i < cap; i++ {
-		// TODO: make the charset configurable
 		client.SetMaxOpenConns(cap)
 		conn := &Connection{ID: i, client: client}
 		conns <- conn
