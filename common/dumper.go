@@ -10,6 +10,7 @@
 package common
 
 import (
+	"compress/gzip"
 	"encoding/csv"
 	"errors"
 	"fmt"
@@ -187,7 +188,7 @@ func dumpTable(log *xlog.Log, conn *Connection, args *config.Config, database st
 }
 
 // Dump a table in CSV/TSV format
-func dumpTableCsv(log *xlog.Log, conn *Connection, args *config.Config, database string, table string, separator rune) {
+func dumpTableCsv(log *xlog.Log, conn *Connection, args *config.Config, database string, table string, separator rune, compress bool) {
 	var allBytes uint64
 	var allRows uint64
 	var where string
@@ -232,9 +233,21 @@ func dumpTableCsv(log *xlog.Log, conn *Connection, args *config.Config, database
 	AssertNil(err)
 
 	fileNo := 1
-	file, err := os.Create(fmt.Sprintf("%s/%s.%s.%05d.csv", args.Outdir, database, table, fileNo))
+	extension := "csv"
+	if compress {
+		extension = extension + ".gz"
+	}
+	file, err := os.Create(fmt.Sprintf("%s/%s.%s.%05d.%s", args.Outdir, database, table, fileNo, extension))
 	AssertNil(err)
-	writer := csv.NewWriter(file)
+
+	var writer *csv.Writer
+	var zipWriter *gzip.Writer
+	if compress {
+		zipWriter, _ = gzip.NewWriterLevel(file, 1)
+		writer = csv.NewWriter(zipWriter)
+	} else {
+		writer = csv.NewWriter(file)
+	}
 	writer.Comma = separator
 	writer.Write(headerfields)
 
@@ -292,10 +305,19 @@ func dumpTableCsv(log *xlog.Log, conn *Connection, args *config.Config, database
 		if (chunkbytes / 1024 / 1024) >= args.ChunksizeInMB {
 			log.Info("dumping.table[%s.%s].rows[%v].bytes[%vMB].part[%v].thread[%d]", database, table, allRows, allBytes / 1024 / 1024, fileNo, conn.ID)
 			writer.Flush()
+			if zipWriter != nil {
+				zipWriter.Close()
+			}
+			file.Close()
 			fileNo++
-			file, err := os.Create(fmt.Sprintf("%s/%s.%s.%05d.csv", args.Outdir, database, table, fileNo))
+			file, err := os.Create(fmt.Sprintf("%s/%s.%s.%05d.%s", args.Outdir, database, table, fileNo, extension))
 			AssertNil(err)
-			writer = csv.NewWriter(file)
+			if compress {
+				zipWriter, _ = gzip.NewWriterLevel(file, 1)
+				writer = csv.NewWriter(zipWriter)
+			} else {
+				writer = csv.NewWriter(file)
+			}
 			writer.Comma = separator
 			writer.Write(headerfields)
 			log.Info("dumping.table[%s.%s].rows[%v].bytes[%vMB].part[%v].thread[%d]", database, table, allRows, allBytes / 1024 / 1024, fileNo, conn.ID)
@@ -303,7 +325,12 @@ func dumpTableCsv(log *xlog.Log, conn *Connection, args *config.Config, database
 			chunkbytes = 0
 		}
 	}
+
 	writer.Flush()
+	if zipWriter != nil {
+		zipWriter.Close()
+	}
+	file.Close()
 	err = rows.Close()
 	AssertNil(err)
 
@@ -412,9 +439,13 @@ func Dumper(log *xlog.Log, args *config.Config) {
 				if args.Format == "mysql" || args.Format == "" {
 					dumpTable(log, conn, args, database, table)
 				} else if args.Format == "tsv" {
-					dumpTableCsv(log, conn, args, database, table, '\t')
+					dumpTableCsv(log, conn, args, database, table, '\t', false)
+				} else if args.Format == "tsv.gz" {
+					dumpTableCsv(log, conn, args, database, table, '\t', true)
 				} else if args.Format == "csv" {
-					dumpTableCsv(log, conn, args, database, table, ',')
+					dumpTableCsv(log, conn, args, database, table, ',', false)
+				} else if args.Format == "csv.gz" {
+					dumpTableCsv(log, conn, args, database, table, ',', true)
 				} else {
 					AssertNil(errors.New(fmt.Sprintf("unknown dump format: [%v]", args.Format)))
 				}

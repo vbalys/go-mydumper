@@ -28,9 +28,11 @@ initvars=tls=skip-verify&charset=utf8mb4
 #   if we don't use streaming selects, we'll run into row limits.
 vars=tls=skip-verify&charset=utf8mb4&workload=olap
 # Format to dump:
-#  mysql - MySQL inserts (default)
-#  tsv   - TSV format
-#  csv   - CSV format
+#  mysql  - MySQL inserts (default)
+#  tsv    - TSV format
+#  tsv.gz - TSV format (gzipped)
+#  csv    - CSV format
+#  csv.gz - CSV format (gzipped)
 format = mysql
 
 # Use this to use regexp to control what databases to export. These are optional
