@@ -7,14 +7,17 @@
 
 ***go-mydumper*** is a multi-threaded MySQL backup and restore tool, and it is compatible with [maxbube/mydumper](https://github.com/maxbube/mydumper) in the layout.
 
-This build has been lightly patched to enable using it with [Vitess](https://vitess.io), by running it directly against Vitess vtgate.
+This build has been patched to:
+  * enable using it with [Vitess](https://vitess.io), by running it directly against Vitess vtgate.
+  * replace the MySQL driver used with https://github.com/go-sql-driver/mysql , to allow using TLS against the server
+  * add support for dumping CSV/TSV files in compressed (gzip) format
 
 ## Build
 
 ```
 $ git clone https://github.com/aquarapid/go-mydumper
 $ cd go-mydumper
-$ git checkout jg_vitess_tls
+$ git checkout jacques_vitess
 $ make build
 $ ./bin/mydumper -h
 $ ./bin/myloader -h
@@ -94,13 +97,6 @@ $ bin/myloader -h 127.0.0.1 -P 15306 -u root -p root -d dumper-sql
  2020/07/24 09:58:22.861739 loader.go:147:       [INFO]         restoring.tables[commerce.corder].parts[00001].thread[3].done...
  2020/07/24 09:58:22.861795 loader.go:204:       [INFO]         restoring.all.done.cost[0.03sec].allbytes[0.00MB].rate[0.00MB/s]
 ```
-
-## Known issues
-
-  * Note that there is a known issue in Vitess
-  (https://github.com/vitessio/vitess/issues/8447) where, if you have query
-  logging enabled, your bulk data load via `myloader` might use significantly
-  more memory for you `vtgate` and/or `vttablet` than you might expect.
 
 ## License
 
