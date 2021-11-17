@@ -11,10 +11,11 @@ package common
 
 import (
 	"database/sql"
+	"sync"
+
 	_ "github.com/go-sql-driver/mysql"
 	_ "github.com/xelabs/go-mysqlstack/sqlparser/depends/sqltypes"
 	"github.com/xelabs/go-mysqlstack/xlog"
-	"sync"
 )
 
 // Pool tuple.
@@ -40,13 +41,17 @@ func NewPool(log *xlog.Log, cap int, address string, user string, password strin
 	conns := make(chan *Connection, cap)
 	var client *sql.DB
 	var err error
+	var userPassword = user
+	if password != "" {
+		userPassword = userPassword + ":" + password
+	}
 	if vars != "" {
-		client, err = sql.Open("mysql", user+":"+password+"@tcp("+address+")/"+database+"?"+vars)
+		client, err = sql.Open("mysql", userPassword+"@tcp("+address+")/"+database+"?"+vars)
 		if err != nil {
 			return nil, err
 		}
 	} else {
-		client, err = sql.Open("mysql", user+":"+password+"@tcp("+address+")/"+database)
+		client, err = sql.Open("mysql", userPassword+"@tcp("+address+")/"+database)
 		if err != nil {
 			return nil, err
 		}

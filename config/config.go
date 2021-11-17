@@ -69,10 +69,6 @@ func ParseDumperConfig(file string) (*Config, error) {
 	}
 
 	user := cfg.Section("mysql").Key("user").String()
-	if user == "" {
-		return nil, errors.New("empty user")
-	}
-
 	password := cfg.Section("mysql").Key("password").String()
 	database := cfg.Section("mysql").Key("database").String()
 	outdir := cfg.Section("mysql").Key("outdir").String()

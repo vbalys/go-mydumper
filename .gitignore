@@ -11,3 +11,5 @@ src/github.com/
 
 tags
 coverage.out
+
+config/mydumper.ini

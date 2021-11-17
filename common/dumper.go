@@ -116,7 +116,7 @@ func dumpTable(log *xlog.Log, conn *Connection, args *config.Config, database st
 		AssertNil(err)
 
 		values := make([]string, 0, 16)
-		rowsize := 3  // start and end paren plus newline
+		rowsize := 3 // start and end paren plus newline
 		for i, col := range cols {
 			colKind := fieldTypes[i]
 			if col == nil || colKind == "NULL" {
@@ -165,7 +165,7 @@ func dumpTable(log *xlog.Log, conn *Connection, args *config.Config, database st
 			file := fmt.Sprintf("%s/%s.%s.%05d.sql", args.Outdir, database, table, fileNo)
 			WriteFile(file, query)
 
-			log.Info("dumping.table[%s.%s].rows[%v].bytes[%vMB].part[%v].thread[%d]", database, table, allRows, allBytes / 1024 / 1024, fileNo, conn.ID)
+			log.Info("dumping.table[%s.%s].rows[%v].bytes[%vMB].part[%v].thread[%d]", database, table, allRows, allBytes/1024/1024, fileNo, conn.ID)
 			inserts = inserts[:0]
 			chunkbytes = 0
 			fileNo++
@@ -184,7 +184,7 @@ func dumpTable(log *xlog.Log, conn *Connection, args *config.Config, database st
 	err = rows.Close()
 	AssertNil(err)
 
-	log.Info("dumping.table[%s.%s].done.allrows[%v].allbytes[%vMB].thread[%d]...", database, table, allRows, allBytes / 1024 / 1024, conn.ID)
+	log.Info("dumping.table[%s.%s].done.allrows[%v].allbytes[%vMB].thread[%d]...", database, table, allRows, allBytes/1024/1024, conn.ID)
 }
 
 // Dump a table in CSV/TSV format
@@ -268,7 +268,7 @@ func dumpTableCsv(log *xlog.Log, conn *Connection, args *config.Config, database
 		AssertNil(err)
 
 		values := make([]string, 0, 16)
-		rowsize := 3  // start and end paren plus newline
+		rowsize := 3 // start and end paren plus newline
 		for i, col := range cols {
 			colKind := fieldTypes[i]
 			if col == nil || colKind == "NULL" {
@@ -303,7 +303,7 @@ func dumpTableCsv(log *xlog.Log, conn *Connection, args *config.Config, database
 		atomic.AddUint64(&args.Allrows, 1)
 
 		if (chunkbytes / 1024 / 1024) >= args.ChunksizeInMB {
-			log.Info("dumping.table[%s.%s].rows[%v].bytes[%vMB].part[%v].thread[%d]", database, table, allRows, allBytes / 1024 / 1024, fileNo, conn.ID)
+			log.Info("dumping.table[%s.%s].rows[%v].bytes[%vMB].part[%v].thread[%d]", database, table, allRows, allBytes/1024/1024, fileNo, conn.ID)
 			writer.Flush()
 			if zipWriter != nil {
 				zipWriter.Close()
@@ -320,7 +320,7 @@ func dumpTableCsv(log *xlog.Log, conn *Connection, args *config.Config, database
 			}
 			writer.Comma = separator
 			writer.Write(headerfields)
-			log.Info("dumping.table[%s.%s].rows[%v].bytes[%vMB].part[%v].thread[%d]", database, table, allRows, allBytes / 1024 / 1024, fileNo, conn.ID)
+			log.Info("dumping.table[%s.%s].rows[%v].bytes[%vMB].part[%v].thread[%d]", database, table, allRows, allBytes/1024/1024, fileNo, conn.ID)
 			inserts = inserts[:0]
 			chunkbytes = 0
 		}
@@ -334,7 +334,7 @@ func dumpTableCsv(log *xlog.Log, conn *Connection, args *config.Config, database
 	err = rows.Close()
 	AssertNil(err)
 
-	log.Info("dumping.table[%s.%s].done.allrows[%v].allbytes[%vMB].thread[%d]...", database, table, allRows, allBytes / 1024 / 1024, conn.ID)
+	log.Info("dumping.table[%s.%s].done.allrows[%v].allbytes[%vMB].thread[%d]...", database, table, allRows, allBytes/1024/1024, conn.ID)
 }
 
 func allTables(log *xlog.Log, conn *Connection, database string) []string {
@@ -469,5 +469,5 @@ func Dumper(log *xlog.Log, args *config.Config) {
 
 	wg.Wait()
 	elapsed := time.Since(t).Seconds()
-	log.Info("dumping.all.done.cost[%.2fsec].allrows[%v].allbytes[%v].rate[%.2fMB/s]", elapsed, args.Allrows, args.Allbytes, float64(args.Allbytes/1024/1024) / elapsed)
+	log.Info("dumping.all.done.cost[%.2fsec].allrows[%v].allbytes[%v].rate[%.2fMB/s]", elapsed, args.Allrows, args.Allbytes, float64(args.Allbytes/1024/1024)/elapsed)
 }

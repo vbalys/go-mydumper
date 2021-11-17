@@ -48,7 +48,7 @@ func main() {
 	flag.Usage = func() { usage() }
 	flag.Parse()
 
-	if flagHost == "" || flagUser == "" || flagDir == "" {
+	if flagHost == "" || flagDir == "" {
 		usage()
 		os.Exit(0)
 	}
